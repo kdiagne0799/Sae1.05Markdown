@@ -36,7 +36,6 @@ graph LR
     C -->|md_to_html.py| D[Network_Report.html]
 ```
 
-> Modular approach: each step is independent and replaceable (e.g., swap HTML generator).
 
 ---
 
