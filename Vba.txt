@@ -1,0 +1,259 @@
+Sub AnalyseReseauComplete()
+    ' ==========================================================================================
+    ' SAÉ 1.05 - DASHBOARD D'ANALYSE RÉSEAU & CYBERSÉCURITÉ (Version Design Pro)
+    ' Description : Analyse les logs tcpdump et génère un rapport visuel moderne.
+    ' ==========================================================================================
+
+    Dim wsData As Worksheet, wsDash As Worksheet
+    Dim lastRow As Long, i As Long
+    Dim dictIP As Object, dictOctets As Object, dictSSH As Object, dictSYN As Object
+    Dim dictScan As Object, subDict As Object
+    Dim srcIP As String, dstPort As String, flags As String, proto As String
+    Dim pktLen As Long
+    Dim anomalies As Collection
+    
+    ' Optimisation de l'affichage
+    Application.ScreenUpdating = False
+    Application.DisplayAlerts = False
+    
+    ' Initialisation des dictionnaires
+    Set dictIP = CreateObject("Scripting.Dictionary")      ' Compte paquets par IP
+    Set dictOctets = CreateObject("Scripting.Dictionary")  ' Volume par IP
+    Set dictSSH = CreateObject("Scripting.Dictionary")     ' Attaques SSH par IP
+    Set dictSYN = CreateObject("Scripting.Dictionary")     ' SYN Flood par IP
+    Set dictScan = CreateObject("Scripting.Dictionary")    ' Scan de ports (IP -> Liste ports)
+    Set anomalies = New Collection
+    
+    ' Gestion de la feuille de données
+    Set wsData = ActiveSheet
+    lastRow = wsData.Cells(wsData.Rows.Count, "A").End(xlUp).Row
+    
+    ' --- 1. NETTOYAGE & PRÉPARATION ---
+    If Application.WorksheetFunction.CountA(wsData.Columns(2)) = 0 Then
+        wsData.Columns("A:A").TextToColumns Destination:=Range("A1"), DataType:=xlDelimited, _
+            Semicolon:=True, Tab:=False, Comma:=False, Space:=False, Other:=False
+    End If
+    
+    ' --- 2. ANALYSE DES DONNÉES (LOGIQUE CONSERVÉE) ---
+    For i = 2 To lastRow
+        srcIP = CStr(wsData.Cells(i, 2).Value)
+        dstPort = LCase(CStr(wsData.Cells(i, 5).Value))
+        flags = UCase(CStr(wsData.Cells(i, 6).Value))
+        pktLen = Val(wsData.Cells(i, 7).Value)
+        
+        If srcIP <> "" Then
+            ' A. Compteurs globaux
+            dictIP(srcIP) = dictIP(srcIP) + 1
+            dictOctets(srcIP) = dictOctets(srcIP) + pktLen
+            
+            ' B. Détection SSH
+            If dstPort = "22" Or dstPort = "ssh" Then dictSSH(srcIP) = dictSSH(srcIP) + 1
+            
+            ' C. Détection SYN Flood
+            If InStr(flags, "S") > 0 Then dictSYN(srcIP) = dictSYN(srcIP) + 1
+            
+            ' D. Détection Port Scan
+            If Not dictScan.Exists(srcIP) Then
+                Set subDict = CreateObject("Scripting.Dictionary")
+                dictScan.Add srcIP, subDict
+            End If
+            If Not dictScan(srcIP).Exists(dstPort) Then dictScan(srcIP).Add dstPort, 1
+        End If
+    Next i
+    
+    ' --- 3. IDENTIFICATION DES ANOMALIES (SEUILS CONSERVÉS) ---
+    Dim k As Variant
+    
+    ' Scan de Ports (> 5 ports)
+    For Each k In dictScan.Keys
+        If dictScan(k).Count > 5 Then anomalies.Add "?? PORT SCAN|" & k & "|Visé " & dictScan(k).Count & " ports|CRITIQUE"
+    Next k
+    
+    ' SSH Brute Force (> 20 tentatives)
+    For Each k In dictSSH.Keys
+        If dictSSH(k) > 20 Then anomalies.Add "?? BRUTE FORCE SSH|" & k & "|" & dictSSH(k) & " tentatives|CRITIQUE"
+    Next k
+    
+    ' SYN Flood (> 50 paquets)
+    For Each k In dictSYN.Keys
+        If dictSYN(k) > 50 Then anomalies.Add "?? SYN FLOOD|" & k & "|" & dictSYN(k) & " paquets SYN|HAUTE"
+    Next k
+    
+    ' --- 4. CRÉATION DU DASHBOARD (MISE EN PAGE AMÉLIORÉE) ---
+    On Error Resume Next
+    Worksheets("Dashboard_Securite").Delete
+    On Error GoTo 0
+    Set wsDash = Worksheets.Add(Before:=wsData)
+    wsDash.Name = "Dashboard_Securite"
+    
+    ' A. Configuration de la grille (Colonnes)
+    ' A: Marge, B: Alertes/KPI, C: Alertes, D: Alertes, E: Marge, F: Graphiques
+    wsDash.Columns("A").ColumnWidth = 2
+    wsDash.Columns("B").ColumnWidth = 20
+    wsDash.Columns("C").ColumnWidth = 25
+    wsDash.Columns("D").ColumnWidth = 15
+    wsDash.Columns("E").ColumnWidth = 2 ' Séparateur
+    wsDash.Columns("F").ColumnWidth = 50
+    
+    ' B. En-tête (Header)
+    With wsDash.Range("B2:F3")
+        .Merge
+        .Value = "DASHBOARD DE SÉCURITÉ RÉSEAU (SAÉ 1.05)"
+        .Font.Name = "Segoe UI"
+        .Font.Size = 22
+        .Font.Bold = True
+        .Font.Color = RGB(255, 255, 255)
+        .Interior.Color = RGB(44, 62, 80) ' Midnight Blue
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+        .Borders.LineStyle = xlContinuous
+    End With
+    
+    ' C. Cartes KPIs (Indicateurs) - Design "Carte"
+    ' On place les KPIs en ligne 5 et 6
+    Call DesignerCartePro(wsDash, "B5", "TOTAL PAQUETS", lastRow - 1, RGB(52, 152, 219))
+    Call DesignerCartePro(wsDash, "C5", "IP UNIQUES", dictIP.Count, RGB(26, 188, 156))
+    Call DesignerCartePro(wsDash, "D5", "MENACES", anomalies.Count, IIf(anomalies.Count > 0, RGB(231, 76, 60), RGB(39, 174, 96)))
+    
+    ' D. Tableau des Menaces (Gauche)
+    wsDash.Range("B9").Value = "JOURNAL DES ALERTES"
+    wsDash.Range("B9").Font.Name = "Segoe UI"
+    wsDash.Range("B9").Font.Size = 14
+    wsDash.Range("B9").Font.Bold = True
+    wsDash.Range("B9").Font.Color = RGB(100, 100, 100)
+    
+    ' En-têtes tableau
+    With wsDash.Range("B10:D10")
+        .Value = Array("TYPE", "SOURCE / DÉTAILS", "GRAVITÉ")
+        .Font.Bold = True
+        .Font.Color = vbWhite
+        .Interior.Color = RGB(127, 140, 141) ' Gris pro
+        .HorizontalAlignment = xlCenter
+        .Borders.LineStyle = xlContinuous
+    End With
+    
+    Dim rowIdx As Long: rowIdx = 11
+    If anomalies.Count > 0 Then
+        Dim alertParts() As String
+        For i = 1 To anomalies.Count
+            alertParts = Split(anomalies(i), "|")
+            
+            wsDash.Cells(rowIdx, 2).Value = alertParts(0) ' Type
+            wsDash.Cells(rowIdx, 3).Value = alertParts(1) & vbCrLf & alertParts(2) ' IP + Détails
+            wsDash.Cells(rowIdx, 4).Value = alertParts(3) ' Gravité
+            
+            ' Centrage et bordures
+            wsDash.Range("B" & rowIdx & ":D" & rowIdx).VerticalAlignment = xlCenter
+            wsDash.Range("B" & rowIdx & ":D" & rowIdx).Borders.LineStyle = xlContinuous
+            wsDash.Range("B" & rowIdx & ":D" & rowIdx).WrapText = True
+            
+            ' Coloration Gravité
+            If alertParts(3) = "CRITIQUE" Then
+                wsDash.Cells(rowIdx, 4).Interior.Color = RGB(250, 219, 216)
+                wsDash.Cells(rowIdx, 4).Font.Color = RGB(192, 57, 43)
+                wsDash.Cells(rowIdx, 4).Font.Bold = True
+            End If
+            
+            rowIdx = rowIdx + 1
+        Next i
+    Else
+        wsDash.Range("B11").Value = "? Aucune activité suspecte détectée."
+        wsDash.Range("B11:D11").Merge
+        wsDash.Range("B11").HorizontalAlignment = xlCenter
+        wsDash.Range("B11").Borders.LineStyle = xlContinuous
+        rowIdx = 12
+    End If
+    
+    ' E. Graphique Top 5 (Droite)
+    ' 1. Préparation des données (cachées en colonne O et P)
+    wsDash.Range("O1").Value = "IP"
+    wsDash.Range("P1").Value = "Volume"
+    
+    ' Tri des données (Bubble Sort rapide sur les volumes)
+    Dim arrKeys As Variant, arrItems As Variant
+    arrKeys = dictOctets.Keys
+    arrItems = dictOctets.Items
+    Dim x As Long, y As Long, tempVal As Variant, tempKey As Variant
+    
+    For x = LBound(arrItems) To UBound(arrItems) - 1
+        For y = x + 1 To UBound(arrItems)
+            If arrItems(y) > arrItems(x) Then
+                tempVal = arrItems(x): arrItems(x) = arrItems(y): arrItems(y) = tempVal
+                tempKey = arrKeys(x): arrKeys(x) = arrKeys(y): arrKeys(y) = tempKey
+            End If
+        Next y
+    Next x
+    
+    ' Écriture Top 5 dans les cellules cachées
+    Dim r As Long: r = 2
+    For x = 0 To UBound(arrKeys)
+        If x >= 5 Then Exit For
+        wsDash.Cells(r, 15).Value = arrKeys(x)
+        wsDash.Cells(r, 16).Value = arrItems(x)
+        r = r + 1
+    Next x
+    
+    ' 2. Création du Graphique à droite des alertes (Colonne F)
+    Dim chartObj As ChartObject
+    ' Le graphique commence ligne 10 (aligné avec le tableau)
+    Set chartObj = wsDash.ChartObjects.Add(Left:=wsDash.Columns("F").Left + 10, _
+                                           Top:=wsDash.Rows(10).Top, _
+                                           Width:=350, Height:=250)
+    
+    With chartObj.Chart
+        .SetSourceData Source:=wsDash.Range("O1:P" & r - 1)
+        .ChartType = xlBarClustered ' Barres horizontales pour lire les IP facilement
+        .HasTitle = True
+        .ChartTitle.Text = "TOP 5 IP SOURCES (VOLUME)"
+        .ChartTitle.Font.Size = 12
+        .Legend.Delete
+    End With
+    
+    ' --- 5. FINITIONS ---
+    wsDash.Activate
+    ActiveWindow.DisplayGridlines = False
+    Application.ScreenUpdating = True
+    
+    MsgBox "Analyse terminée !" & vbCrLf & anomalies.Count & " alerte(s) identifiée(s).", vbInformation
+
+End Sub
+
+' Sous-routine pour créer des cartes KPIs modernes
+Sub DesignerCartePro(ws As Worksheet, startCell As String, titre As String, valeur As Variant, couleurBande As Long)
+    Dim r As Range
+    Set r = ws.Range(startCell)
+    
+    ' Cellule Titre (Haut)
+    With r
+        .Value = titre
+        .Font.Name = "Segoe UI"
+        .Font.Size = 9
+        .Font.Color = RGB(100, 100, 100)
+        .HorizontalAlignment = xlCenter
+        .Borders(xlEdgeTop).LineStyle = xlContinuous
+        .Borders(xlEdgeLeft).LineStyle = xlContinuous
+        .Borders(xlEdgeRight).LineStyle = xlContinuous
+    End With
+    
+    ' Cellule Valeur (Milieu)
+    With r.Offset(1, 0)
+        .Value = Format(valeur, "#,##0")
+        .Font.Name = "Segoe UI"
+        .Font.Size = 20
+        .Font.Bold = True
+        .Font.Color = RGB(50, 50, 50)
+        .HorizontalAlignment = xlCenter
+        .Borders(xlEdgeLeft).LineStyle = xlContinuous
+        .Borders(xlEdgeRight).LineStyle = xlContinuous
+    End With
+    
+    ' Bande Couleur (Bas)
+    With r.Offset(2, 0)
+        .Interior.Color = couleurBande
+        .RowHeight = 5 ' Bande fine
+        .Borders(xlEdgeLeft).LineStyle = xlContinuous
+        .Borders(xlEdgeRight).LineStyle = xlContinuous
+        .Borders(xlEdgeBottom).LineStyle = xlContinuous
+    End With
+End Sub
+
