@@ -45,12 +45,12 @@ This project was developed to investigate network saturation issues in a product
 
 ## ⚙️ Key Features
 
-### 📊 **Data preparation**
+### 📊 Data preparation
 - Read a dump file (`DumpFile.txt` from `tcpdump` command).
 - Extract relevant fields: IP addresses, ports, timestamps, TCP flags, protocols.
 - Export clean structured data to CSV format (`Network_Analysis.csv`) for further analysis.
 
-### 🔍 **Security analysis**
+### 🔍 Security analysis
 The tool detects common attack patterns using threshold-based heuristics:
 
 - **SSH Brute Force Detection**
@@ -71,9 +71,8 @@ The tool detects common attack patterns using threshold-based heuristics:
 
 - **Top Talkers Analysis**
   - Lists most active IPs by packet count to identify bandwidth hogs or compromised hosts.
-📝 PARTIE 2 - Milieu du README (lignes 81-160)
-text
-### 📄 **Reporting**
+
+### 📄 Reporting
 - Generate a detailed Markdown report (`Network_Report.md`) with:
   - Executive summary of findings
   - Detailed alerts with timestamps and IP addresses
@@ -86,14 +85,11 @@ text
 ## 🔄 Pipeline
 
 ```mermaid
-flowchart LR
-    A[DumpFile.txt<br/>tcpdump raw output] --> B[txt_to_csv.py<br/>Extraction & Parsing]
-    B --> C[Network_Analysis.csv<br/>Structured data]
-    C --> D[csv_to_md.py<br/>Security Analysis]
-    D --> E[Network_Report.md<br/>Markdown report]
-    E --> F[md_to_html.py<br/>HTML Conversion]
-    F --> G[Network_Report.html<br/>Final styled report]
-    C --> H[Excel Analysis<br/>Charts & Pivot Tables]
+graph LR
+    A[DumpFile.txt] -->|txt_to_csv.py| B[Network_Analysis.csv]
+    B -->|csv_to_md.py| C[Network_Report.md]
+    C -->|md_to_html.py| D[Network_Report.html]
+    B --> E[Excel Analysis]
 📁 Project structure
 File	Purpose
 DumpFile.txt	Example raw dump from tcpdump command
@@ -147,19 +143,11 @@ Cleans and normalizes data
 
 Exports to CSV format with proper headers
 
-text
+2️⃣ csv_to_md.py - Analyze and generate report
+Input: Network_Analysis.csv
+Output: Network_Report.md
 
-***
-
-## 📝 **PARTIE 3 - Fin du README (lignes 161-fin)**
-
-```markdown
-### 2️⃣ `csv_to_md.py` - Analyze and generate report
-
-**Input:** `Network_Analysis.csv`  
-**Output:** `Network_Report.md`
-
-```bash
+bash
 python csv_to_md.py [--input Network_Analysis.csv] [--output Network_Report.md]
 What it does:
 
@@ -169,15 +157,7 @@ Applies security detection algorithms (SSH brute force, port scans, SYN floods)
 
 Identifies unencrypted traffic and top talkers
 
-Generates structured Markdown report with:
-
-Executive summary
-
-Critical alerts with detailed evidence
-
-Traffic statistics
-
-Remediation recommendations
+Generates structured Markdown report with executive summary, alerts, and recommendations
 
 3️⃣ md_to_html.py - Convert to HTML
 Input: Network_Report.md
@@ -212,11 +192,6 @@ text
 - **Attempts:** 66 connection attempts in 5 minutes
 - **Target:** 10.0.0.5:22
 - **Recommendation:** Block source IP and enable fail2ban
-
-### Port Scan Detected
-- **Source IP:** 172.16.0.50
-- **Ports scanned:** 35 unique ports on target 10.0.0.10
-- **Recommendation:** Investigate source host for compromise
 HTML Report
 The HTML output includes:
 
@@ -302,7 +277,7 @@ This project demonstrates:
 ✅ AC03.16: Using GitHub for collaborative development and version control
 
 📜 License & Contact
-License: This project is provided as-is for educational purposes (SAE 1.05). Add a LICENSE file if you wish to define specific open-source terms.
+License: This project is provided as-is for educational purposes (SAE 1.05)
 
 Author: Khadim Diagne
 
@@ -319,3 +294,4 @@ tcpdump maintainers for the network capture tool
 
 Python community for excellent standard library documentation
 
+Made with 💻 for SAE 1.05 - BUT R&T S1 - IUT de Roanne
