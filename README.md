@@ -3,149 +3,147 @@
 ## 📋 Prerequisites
 
 ### Required Python Version
+
 - **Python 3.8 or higher**
 
 ### Required Libraries
+
+All required modules are included in the Python standard library:
+
 ```python
-os              # File operations (included with Python)
-csv             # CSV file handling (included with Python)
-re              # Regular expressions (included with Python)
-collections     # Data structures (included with Python)
-datetime        # Timestamp handling (included with Python)
-No external packages needed! Everything uses Python's standard library.
+os              # File operations
+csv             # CSV file handling
+re              # Regular expressions
+collections     # Data structures (Counter, defaultdict)
+datetime        # Timestamp handling
+```
 
-Optional Software
-Microsoft Excel (for manual data analysis and pivot tables)
+No external packages needed.
 
-🎯 What This Project Does
-This tool helps you find out why a network is having problems. It reads network traffic files (tcpdump format) and tells you if something suspicious is happening - like SSH brute force attacks, port scans, or ICMP floods.
+**Optional software:** Microsoft Excel (for manual data analysis and pivot tables)
 
-I built this for my university project at IUT Roanne. The idea was simple: our company has two sites (one in France, one in India), and the network in India was having issues. Normal checks didn't work, so I created these Python programs to dig deeper into the traffic data.
+---
 
-📦 What's Inside
-The project has three main Python scripts:
+## 🎯 What this project does
 
-Script	Purpose
-txt_to_csv.py	Converts raw tcpdump text file → clean CSV spreadsheet
-csv_to_md.py	Analyzes CSV data → generates Markdown report with security alerts
-md_to_html.py	Converts Markdown report → styled HTML page for presentation
-Files Generated
-Network_Analysis.csv - Structured data (semicolon-separated)
+This tool helps you find out why a network is having problems. It reads network traffic files (tcpdump format) and detects suspicious activities such as SSH brute force attacks, port scans, and ICMP floods.
 
-Network_Report.md - Security analysis report (Markdown format)
+This project was developed for a university assignment at IUT Roanne: two company sites (France and India) experienced network issues and needed deeper traffic analysis than standard tools provided.
 
-Network_Report.html - Final styled report (HTML with embedded CSS)
+---
 
-⚙️ How It Works
-📝 txt_to_csv.py Explained
-The first script reads your raw tcpdump output and extracts all the important information:
+## 📦 What's inside
 
-⏰ Timestamp - When each packet was sent
+### Scripts and purpose
 
-🔌 Protocol - TCP, UDP, ICMP, etc.
+| Script | Purpose |
+|---|---|
+| `txt_to_csv.py` | Converts raw tcpdump text file → clean CSV (semicolon-separated) |
+| `csv_to_md.py` | Analyzes CSV → generates Markdown report with security alerts |
+| `md_to_html.py` | Converts Markdown report → styled HTML page for presentation |
 
-📍 Source IP & Port - Where it came from
+### Files generated
 
-🎯 Destination IP & Port - Where it was going
+- `Network_Analysis.csv` — Structured data (semicolon-separated)
+- `Network_Report.md` — Security analysis report (Markdown)
+- `Network_Report.html` — Final styled report (HTML with embedded CSS)
 
-🚩 TCP Flags - SYN, ACK, FIN, RST, etc.
+---
 
-📏 Packet Length - Size of each packet
+## ⚙️ How it works
 
-Then it saves everything into a CSV file with semicolon separators for easy Excel import.
+### txt_to_csv.py — parsing raw tcpdump
 
-Example Input (DumpFile.txt):
+The script extracts:
 
-text
+- Timestamp — when each packet was captured
+- Protocol — TCP, UDP, ICMP, etc.
+- Source IP & Port
+- Destination IP & Port
+- TCP Flags — SYN, ACK, FIN, RST, etc.
+- Packet Length
+
+It writes a CSV with semicolon separators so it can be easily opened in Excel.
+
+**Example input (excerpt from DumpFile.txt):**
+
+```
 15:34:04.766656 IP 192.168.1.100.52341 > 10.0.0.5.22: Flags [S], seq 0, win 65535, length 0
-Example Output (Network_Analysis.csv):
+```
 
-text
+**Example output (CSV row):**
+
+```
 Timestamp;Source_IP;Source_Port;Dest_IP;Dest_Port;Protocol;Flags;Length;Packet_Info
 15:34:04.766656;192.168.1.100;52341;10.0.0.5;22;TCP;S;60;SSH connection attempt
-🔍 csv_to_md.py Explained
-The second script reads your CSV file and does the detective work. It looks for three main security threats:
+```
 
-🚨 Detection Thresholds
-Attack Type	Description	Threshold
-🔴 SSH Brute Force	When one IP sends too many SSH connection attempts to port 22	> 50 SSH packets in 5 minutes
-🟠 Port Scanning	When one IP is checking many different ports on your network	> 20 different destination ports
-🟡 ICMP Flood (DoS)	When one IP sends excessive ICMP packets (ping flood)	> 50 ICMP packets
-What Gets Detected in Your Network
-Based on the actual analysis of DumpFileB2.txt, here's what was found:
+### csv_to_md.py — detection & reporting
 
-🔴 1. Critical Threat: Targeted SSH Attack
-Source IP: 192.168.190.130
+The script applies simple heuristic thresholds to identify suspicious patterns.
 
-Attack Type: SSH Brute Force (66 packets to port 22)
+#### Detection thresholds
 
-Severity: HIGH 🔴
+| Attack type | Description | Threshold |
+|---|---:|---:|
+| SSH brute force | Many SSH attempts (port 22) from one IP | > 50 SSH packets in 5 minutes |
+| Port scanning | One IP probes many distinct destination ports | > 20 different destination ports |
+| ICMP flood (DoS) | Excessive ICMP packets from one IP | > 50 ICMP packets |
 
-Recommendation: Block source IP immediately, enable fail2ban
+#### Example detections (from DumpFileB2.txt analysis)
 
-🟠 2. Port Scanning Activity
-Scanned Ports: 135 different ports probed
+- 🔴 Critical: Targeted SSH attack — Source: `192.168.190.130` (66 SSH packets to port 22)
+  - Severity: HIGH
+  - Recommendation: block the IP, enable fail2ban
 
-Severity: MEDIUM ⚠️
+- 🟠 Port scanning — 135 ports probed
+  - Severity: MEDIUM
+  - Recommendation: investigate the source host
 
-Recommendation: Investigate source host for compromise
+- 🟡 ICMP flood — 84 ICMP packets detected
+  - Severity: MEDIUM
+  - Recommendation: rate-limit ICMP or apply filtering
 
-🟡 3. ICMP Flood Detected
-Packets: 84 ICMP packets detected
+The script produces `Network_Report.md` with:
 
-Severity: MEDIUM ⚠️
+- Executive summary
+- Lists of suspicious IPs and severity
+- Top 10 active IPs and protocol distribution
+- Recommendations
 
-Potential: Denial of Service (DoS) attempt
+### md_to_html.py — presentation
 
-Recommendation: Rate-limit ICMP traffic
+Converts `Network_Report.md` to a standalone `Network_Report.html` with:
 
-After analyzing, it creates:
+- Embedded CSS (Bootstrap-inspired styles)
+- Color-coded alerts (red/orange/green)
+- Tables and sections ready for presentation or emailing
 
-✅ Network_Report.md - Detailed Markdown report with all statistics and alerts
+---
 
-✅ Lists of suspicious IPs with severity levels
+## 📊 What you get
 
-✅ Top 10 most active IP addresses
+### 1) `Network_Analysis.csv`
 
-✅ Protocol distribution statistics
+CSV table with columns:
 
-🎨 md_to_html.py Explained
-The third script converts your Markdown report into a professional HTML page with:
-
-🎨 Embedded CSS styling (Bootstrap-inspired)
-
-🟥🟧🟩 Color-coded alert sections (red = critical, orange = warning)
-
-📊 Clean tables for data presentation
-
-🌐 Standalone file (no external dependencies, easy to email or present)
-
-📊 What You Get
-When you run all three scripts, here's what gets created:
-
-1. Network_Analysis.csv
-All your network packets in a neat table format (semicolon-separated).
-
-Columns:
-
-text
+```
 Timestamp;Source_IP;Source_Port;Dest_IP;Dest_Port;Protocol;Flags;Length;Packet_Info
-2. Network_Report.md
-A text document with:
+```
 
-📈 Total packets analyzed: 11,016 packets
+### 2) `Network_Report.md`
 
-📦 Total data volume: Statistics per IP
+Includes:
 
-🏆 Top 10 most active IPs
+- Total packets analyzed (e.g., 11,016)
+- Total data volume statistics
+- Top 10 most active IPs
+- Protocol distribution: TCP, UDP, ICMP
+- Security alerts (e.g., 3 threats detected)
 
-📡 Protocol distribution: TCP, UDP, ICMP percentages
+**Example report excerpt:**
 
-🚨 Security alerts: 3 threats detected
-
-Example Report Excerpt:
-
-text
+```markdown
 ## 🚨 Critical Alerts
 
 ### 1. Critical Threat: Targeted SSH Attack
@@ -154,49 +152,57 @@ text
 ### 2. Other Detected Anomalies
 ⚠️ **Port Scanning**: Host probed **135** different ports.
 ⚠️ **ICMP Flood**: 84 packets detected. Potential DoS.
-3. Network_Report.html
-Professional styled HTML page ready for:
+```
 
-📧 Email sharing with your team
+### 3) `Network_Report.html`
 
-🎤 Presentation during your oral defense (12 min)
+A styled HTML page suitable for:
 
-📁 Portfolio submission
+- Email sharing
+- Presentation during the oral defense
+- Portfolio submission
 
-🚀 How to Use This
-Installation
-No packages to install! Just make sure you have Python 3.8+.
+---
 
-Then clone the project:
+## 🚀 How to use
 
-bash
+### Installation
+
+No external packages required. Make sure Python 3.8+ is installed.
+
+```bash
 git clone https://github.com/kdiagne0799/Sae1.05_Network_Report.git
 cd Sae1.05_Network_Report
-🧗 Step-by-Step Usage
-👍 Step 1: Convert your tcpdump file
-Run the first script:
+```
 
-bash
+### Step-by-step usage
+
+1. Convert tcpdump file to CSV:
+
+```bash
 python txt_to_csv.py
-What happens:
+```
 
-text
+Sample console output:
+
+```
 Démarrage de la conversion...
 Lecture : DumpFileB2.txt
 Lignes lues : 507,891
 Paquets extraits : 11,016
 Lignes ignorées : 496,875
 Fichier créé : Network_Analysis.csv
-The program reads your DumpFileB2.txt file and creates Network_Analysis.csv with all packets in structured format.
+```
 
-👍 Step 2: Analyze the data
-Run the second script:
+1. Analyze the CSV and create markdown report:
 
-bash
+```bash
 python csv_to_md.py
-What happens:
+```
 
-text
+Sample console output:
+
+```
 ========== ANALYSE DEMARREE ==========
 
 Lecture de Network_Analysis.csv...
@@ -212,43 +218,108 @@ Détection des anomalies...
 Rapport créé : Network_Report.md
 
 ========== ANALYSE TERMINEE ==========
-👍 Step 3: Generate HTML report
-Run the third script:
+```
 
-bash
+1. Generate an HTML report:
+
+```bash
 python md_to_html.py
-What happens:
+```
 
-text
+Sample console output:
+
+```
 Conversion Markdown → HTML...
 Lecture : Network_Report.md
 Génération HTML avec CSS...
 Fichier créé : Network_Report.html
 
 ✅ Rapport HTML prêt pour présentation !
-👍 Step 4: Check the results
-You'll now have these files:
+```
 
-text
+### Files created
+
+```
 Sae1.05_Network_Report/
 ├── DumpFileB2.txt            # Your original tcpdump file
 ├── Network_Analysis.csv      # Structured data (Excel-ready)
 ├── Network_Report.md         # 📄 Read this first! Main report
 ├── Network_Report.html       # 🌐 Professional styled version
-├── txt_to_csv.py            # Script 1
-├── csv_to_md.py             # Script 2
-├── md_to_html.py            # Script 3
-└── README.md                # This file
-What to read:
+├── txt_to_csv.py             # Script 1
+├── csv_to_md.py              # Script 2
+├── md_to_html.py             # Script 3
+└── README.md                 # This file
+```
 
-Network_Report.md - Read this first. It tells you everything.
+---
 
-Network_Report.html - Open in browser for styled version.
+## 🔍 Understanding the results
 
-If there are problems, they'll be clearly listed with 🔴 red or 🟠 orange warnings.
+If no problems are found, the report will indicate so and provide summary statistics. Otherwise, the report lists alerts with severity and suggested mitigations.
 
-🔍 Understanding the Results
-✅ If No Problems Found
-The report will say:
+---
 
-text
+## 🧪 Tests & fixtures
+
+Include a `/fixtures` folder with:
+
+- `DumpFileB2_sample.txt` (trimmed sample dump)
+- `Network_Analysis_sample.csv` (precomputed CSV)
+- `Network_Report_sample.md` (expected report)
+
+Recommended tests:
+
+- Unit tests for `split_ip_port()` and timestamp extraction
+- Integration test that runs the full pipeline against the sample dump and compares outputs
+
+---
+
+## 🔧 Development & Contributing
+
+- Modular design: each script performs one transformation
+- Standard library only for easy grading and reproducibility
+
+Contribution guidelines:
+
+1. Fork the repo
+2. Create a feature branch: `git checkout -b feature/name`
+3. Add tests and documentation
+4. Open a Pull Request with a clear description
+
+---
+
+## 🔮 Future improvements
+
+- Add CLI arguments for time ranges and filters
+- Export results to JSON for integration with SIEM tools
+- Implement machine learning for anomaly detection
+- Add real-time monitoring mode and web dashboard
+
+---
+
+## 🎓 Learning outcomes
+
+This project demonstrates the following competencies (SAE 1.05):
+
+- AC03.11 — Use of Python, Git, and command-line tools
+- AC03.12 — Reading, modifying, and debugging Python programs
+- AC03.13 — Translating security analysis logic into algorithms
+- AC03.14 — Understanding web technologies (Markdown → HTML)
+- AC03.15 — Choosing appropriate data structures (CSV, dicts, lists)
+- AC03.16 — Using GitHub for collaborative development
+
+---
+
+## 📜 License & Contact
+
+License: MIT (recommended)
+
+Author: Khadim Diagne — contact: <kdiagne799@gmail.com>
+
+---
+
+If you want, I can also:
+
+- add `fixtures/` and sample outputs ✅
+- add `tests/` and basic unit/integration tests 🔧
+- implement `run_report.py` to run the pipeline in one command ⚙️
